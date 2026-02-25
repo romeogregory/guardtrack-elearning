@@ -1,0 +1,115 @@
+{
+  "project_slug": "guardtrack-elearning",
+  "project_summary": "An internal e-learning platform for security guards deployed at Dutch events/festivals. Frontend-only: 4 pages (Dashboard, Catalogus, Cursus Detail, Profiel) with Next.js 15, TypeScript, Tailwind CSS 4, shadcn/ui, Dutch UI, rich mock data, interactive quizzes, and a shield-themed design system.",
+  "out_of_scope": "Backend API / database / authentication, real video playback, file downloads, push notifications, admin/supervisor views, multi-language (i18n), dark mode, actual progress persistence, deployment to production, E2E/unit tests",
+  "shared_patterns": [],
+  "shared_utilities": [],
+  "design_context": "Design system at .interface-design/system.md. Palette: Amber accent (--vest), navy text (--uniform), warm cream surfaces (--briefing). Depth: Subtle shadows. Signature: Shield-shaped progress indicators. Typography: Plus Jakarta Sans. Radius: 6-14px. Spacing: 4px base unit. Animation: 150-300ms, no spring/bounce.",
+  "tasks": [
+    {
+      "index": 0,
+      "title": "[Foundation] Project Scaffolding & Design System Setup",
+      "files": ["package.json", "tsconfig.json", "next.config.ts", "postcss.config.mjs", "src/app/globals.css", "src/lib/utils.ts"],
+      "milestone": "Phase 1: Foundation",
+      "blocked_by_titles": [],
+      "complexity": "medium",
+      "acceptance": [
+        "npm run dev starts without errors",
+        "Plus Jakarta Sans loads as the default font",
+        "Design system tokens are available as CSS variables and Tailwind utilities",
+        "shadcn/ui components render with the custom theme (amber accent, warm surfaces)"
+      ]
+    },
+    {
+      "index": 1,
+      "title": "[Foundation] TypeScript Types & Mock Data Layer",
+      "files": ["src/lib/types.ts", "src/lib/constants.ts", "src/data/mock/guards.ts", "src/data/mock/courses.ts", "src/data/mock/events.ts", "src/data/mock/notifications.ts", "src/data/mock/quiz-questions.ts", "src/data/mock/scenarios.ts"],
+      "milestone": "Phase 1: Foundation",
+      "blocked_by_titles": ["[Foundation] Project Scaffolding & Design System Setup"],
+      "complexity": "medium",
+      "acceptance": [
+        "All types are well-documented with JSDoc comments",
+        "Mock data is realistic and fully Dutch (names, events, certifications)",
+        "At least 3 courses are mandatory with deadlines tied to upcoming events"
+      ]
+    },
+    {
+      "index": 2,
+      "title": "[Foundation] Layout Shell & Navigation",
+      "files": ["src/app/layout.tsx", "src/components/layout/app-sidebar.tsx", "src/components/layout/bottom-tabs.tsx", "src/components/layout/top-bar.tsx", "src/components/shared/notification-item.tsx"],
+      "milestone": "Phase 1: Foundation",
+      "blocked_by_titles": ["[Foundation] Project Scaffolding & Design System Setup"],
+      "complexity": "medium",
+      "acceptance": [
+        "Sidebar visible >=768px, bottom tabs visible <768px",
+        "Active page highlighted with amber accent",
+        "Sidebar collapses to icon-only with toggle button"
+      ]
+    },
+    {
+      "index": 3,
+      "title": "[Components] Shared UI Components",
+      "files": ["src/components/shared/shield-progress.tsx", "src/components/shared/deployment-readiness.tsx", "src/components/shared/course-card.tsx", "src/components/shared/category-card.tsx", "src/components/shared/badge-tag.tsx", "src/components/shared/stats-card.tsx", "src/components/shared/leaderboard-row.tsx", "src/components/shared/cert-card.tsx", "src/components/shared/deployment-card.tsx"],
+      "milestone": "Phase 2: Component Library",
+      "blocked_by_titles": ["[Foundation] Project Scaffolding & Design System Setup", "[Foundation] TypeScript Types & Mock Data Layer"],
+      "complexity": "large",
+      "acceptance": [
+        "Shield progress animates fill on mount (CSS transition)",
+        "All components are responsive (work at 375px and 1280px)",
+        "Components use design system tokens exclusively (no hardcoded colors)"
+      ]
+    },
+    {
+      "index": 4,
+      "title": "[Pages] Dashboard Page",
+      "files": ["src/app/page.tsx"],
+      "milestone": "Phase 3: Pages",
+      "blocked_by_titles": ["[Foundation] TypeScript Types & Mock Data Layer", "[Foundation] Layout Shell & Navigation", "[Components] Shared UI Components"],
+      "complexity": "large",
+      "acceptance": [
+        "Deployment readiness bar prominently positioned at top",
+        "Course cards scroll horizontally on mobile, grid on desktop",
+        "All content is in Dutch and responsive"
+      ]
+    },
+    {
+      "index": 5,
+      "title": "[Pages] Course Catalog Page",
+      "files": ["src/app/catalogus/page.tsx", "src/components/shared/search-filter-bar.tsx"],
+      "milestone": "Phase 3: Pages",
+      "blocked_by_titles": ["[Foundation] TypeScript Types & Mock Data Layer", "[Foundation] Layout Shell & Navigation", "[Components] Shared UI Components"],
+      "complexity": "medium",
+      "acceptance": [
+        "Search filters courses by title and description (client-side)",
+        "Filters work in combination (category + difficulty + type)",
+        "Empty state when no results match filters"
+      ]
+    },
+    {
+      "index": 6,
+      "title": "[Pages] Course Detail & Lesson Page",
+      "files": ["src/app/cursus/[id]/page.tsx", "src/components/shared/video-player-placeholder.tsx", "src/components/shared/reading-content.tsx", "src/components/shared/quiz-question.tsx", "src/components/shared/scenario-exercise.tsx"],
+      "milestone": "Phase 3: Pages",
+      "blocked_by_titles": ["[Foundation] TypeScript Types & Mock Data Layer", "[Foundation] Layout Shell & Navigation", "[Components] Shared UI Components"],
+      "complexity": "large",
+      "acceptance": [
+        "Quiz practice mode: immediate feedback with explanation per question",
+        "Quiz test mode: no per-question feedback, results shown at end with score",
+        "Module sidebar shows clear course structure with completion states"
+      ]
+    },
+    {
+      "index": 7,
+      "title": "[Pages] User Profile Page",
+      "files": ["src/app/profiel/page.tsx", "src/components/shared/skill-radar.tsx"],
+      "milestone": "Phase 3: Pages",
+      "blocked_by_titles": ["[Foundation] TypeScript Types & Mock Data Layer", "[Foundation] Layout Shell & Navigation", "[Components] Shared UI Components"],
+      "complexity": "medium",
+      "acceptance": [
+        "Radar chart renders correctly with 6 axes and is responsive",
+        "Certifications sorted by expiry, visual warning for expiring/expired",
+        "All content is in Dutch and responsive"
+      ]
+    }
+  ]
+}
