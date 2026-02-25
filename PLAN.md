@@ -1,297 +1,347 @@
-# PLAN: TES-48 Shared UI Components
+# PLAN: TES-52 Course Detail & Lesson Page
 
 ## Objective
 
-Build 9 shared UI components used across multiple pages (Dashboard, Catalog, Course Detail, Profile). Every component uses design system tokens exclusively -- no hardcoded colors, spacing, or font sizes. The shield progress indicator is the signature element of the product.
+Build the Course Detail page (`/cursus/[id]`) -- the core learning environment. It contains a module sidebar/accordion, lesson content area, and 4 content-type components: video player placeholder, reading content, quiz question (with practice + test modes), and scenario exercise. This is the most complex page in the application.
 
 ## Dependencies
 
-- **TES-45** (merged): Project scaffolding, design system tokens in `globals.css`, shadcn/ui base components
-- **TES-46** (must be merged before coding starts): TypeScript types in `src/lib/types.ts` and constants in `src/lib/constants.ts` -- components import these types for props
+- **TES-45** (merged): Project scaffolding, design system tokens, shadcn/ui base components
+- **TES-46** (merged): TypeScript types (`src/lib/types.ts`), mock data (`courses.ts`, `quiz-questions.ts`, `scenarios.ts`)
+- **TES-47** (merged): Layout shell -- root layout with sidebar/bottom-tabs, top bar
+- **TES-48** (merged): Shared components -- ShieldProgress, BadgeTag, CourseCard
 
 ## Acceptance Criteria
 
-- Shield progress animates fill on mount using a CSS transition (not just a static fill)
-- All components are responsive -- render correctly at 375px and 1280px widths
-- Components use design system tokens exclusively -- no hardcoded colors, spacing, or font sizes (verify by searching for hex values, `rgb()`, raw px values)
+- Quiz practice mode ("Oefenmodus"): after selecting an answer, immediately shows correct/incorrect feedback with Dutch explanation, allows retrying wrong answers
+- Quiz test mode ("Toetsmodus"): no per-question feedback, all answers collected, results shown at end with total score, pass/fail indicator, and per-question review
+- Module sidebar shows clear course structure with completion states -- each lesson has a shield mini-icon (empty/half/full) and a type icon (video/reading/quiz/scenario)
+
+---
+
+## Key Data Observations
+
+Lessons in `courses.ts` have structural data only (id, title, type, order, duration, completionStatus) -- NO `content` field populated. Quiz questions are in `quiz-questions.ts` (17 questions across 5 courses, matched by `courseId`). Scenarios are in `scenarios.ts` (5 scenarios, matched by `courseId`). Reading and video content must be generated inline since no content data exists for those lesson types.
 
 ---
 
 ## Implementation Steps
 
-### Step 0: Merge TES-46 into this branch
+### Step 1: Create `src/components/shared/video-player-placeholder.tsx`
 
-Before any component work, merge the TES-46 branch (types + mock data) into this branch so that `src/lib/types.ts` and `src/lib/constants.ts` are available for component prop typing.
-
-```bash
-git merge origin/tes-46-foundation-typescript-types-mock-data-layer
-```
-
-### Step 1: Create `src/components/shared/shield-progress.tsx`
-
-The signature element. An SVG shield shape with an animated fill level.
+Placeholder video player component displayed for video-type lessons.
 
 **Props:**
-- `progress: number` -- 0-100 fill percentage
-- `size?: "sm" | "md" | "lg"` -- sm=32px, md=48px, lg=64px (default: md)
-- `variant?: "default" | "complete" | "overdue"` -- default=amber (`--vest`), complete=green (`--cleared`), overdue=red (`--alert`)
-- `showLabel?: boolean` -- show percentage number inside shield (default: false)
-- `icon?: React.ReactNode` -- optional icon overlay instead of percentage
+- `title: string` -- lesson/video title
+- `durationMinutes: number` -- video duration
+- `chapters?: Array<{ title: string; startTime: number }>` -- chapter markers
 - `className?: string`
 
 **Implementation details:**
-- SVG `<path>` defining a shield silhouette (simple, recognizable -- not ornate heraldry)
-- `<clipPath>` using the shield path to clip a filled rectangle
-- Fill rectangle height animated from 0% to `progress`% on mount via CSS transition (`transition: height var(--duration-expand) ease-in-out`)
-- Use `useEffect` + `useState` pattern: render at 0%, then set to target on mount to trigger animation
-- Colors from design system tokens: `var(--vest)` default, `var(--cleared)` complete, `var(--alert)` overdue
-- Shield outline stroke uses `var(--perimeter)`
-- Label text (if shown) uses `var(--uniform)` color, Caption typography (13px, weight 500)
+- 16:9 aspect ratio container using `aspect-video` class
+- Background: dark gradient (`var(--uniform)` to `var(--uniform-secondary)`) to resemble a video player
+- Center: large play button circle (64px, `var(--vest)` background, white triangle icon using Lucide `Play`)
+- Below play button: "Video niet beschikbaar in demo" text in `var(--uniform-muted)` color, Caption typography
+- Bottom bar (simulating player controls):
+  - Fake progress bar: thin line across full width, `var(--uniform-secondary)` track, 0% fill
+  - Controls row: Play/Pause icon, time display "00:00 / {duration}", spacer, playback speed dropdown ("1x" default, options 0.5x/1x/1.5x/2x using a simple button group -- no actual functionality), captions toggle (CC icon button)
+- Chapter markers section below the video: horizontal list of chapter titles with timestamps, styled as small clickable chips (`var(--briefing-elevated)` bg, `var(--perimeter)` border, `var(--radius-sm)`)
+- Border: `var(--perimeter)`, radius: `var(--radius-lg)`
+- "use client" directive needed for interactive control state (speed selection)
 
-**Size map:**
-| Size | Width | Height | Label font |
-|------|-------|--------|------------|
-| sm   | 24px  | 28px   | Micro (11px) |
-| md   | 36px  | 42px   | Caption (13px) |
-| lg   | 48px  | 56px   | Body (15px) |
+### Step 2: Create `src/components/shared/reading-content.tsx`
 
-### Step 2: Create `src/components/shared/deployment-readiness.tsx`
-
-Horizontal bar showing readiness for an upcoming event deployment.
+Rich reading content renderer for reading-type lessons. Since no reading content exists in mock data, this component accepts a `sections` prop and the page will pass inline content.
 
 **Props:**
-- `eventName: string` -- event name (e.g., "Lowlands Festival")
-- `eventDate: string` -- formatted date string
-- `courses: Array<{ id: string; title: string; progress: number; required: boolean }>` -- required courses with their progress
-- `status: "gereed" | "bezig" | "verlopen"` -- overall readiness status
+- `sections: ReadingSection[]` -- array of content sections (uses the `ReadingSection` type from `types.ts`)
 - `className?: string`
 
 **Implementation details:**
-- Full-width card with `var(--briefing-elevated)` surface, `var(--perimeter)` border, `var(--radius-lg)` radius
-- Left side: event name (Heading typography, 20px/600) + date (Caption typography, 13px/500, `var(--uniform-tertiary)`)
-- Right side: row of small ShieldProgress components (size="sm") for each required course, with tooltip showing course title
-- Status badge at far right: "Gereed" (green `--cleared`), "Bezig" (amber `--vest`), "Verlopen" (red `--alert`)
-- When status is "gereed", subtle amber gradient background (`var(--vest-subtle)` to transparent)
-- Responsive: on mobile (<768px), stack vertically -- event info on top, shields in a row below, status badge below shields
-- Shadow: `var(--shadow-lifted)`
+- Renders a list of sections based on the `type` discriminator:
+  - `heading`: `<h2>` with Heading typography (20px/600), `var(--uniform)` color, margin-top `var(--space-8)`
+  - `paragraph`: `<p>` with Body typography (15px/400), `var(--uniform-secondary)` color, line-height 1.7, margin-top `var(--space-4)`
+  - `bullets`: `<ul>` with disc markers, items in Body typography, `var(--uniform-secondary)` color, left padding `var(--space-6)`, gap `var(--space-2)` between items
+  - `info-callout`: Box with `var(--dispatch-light)` background, `var(--dispatch)` left border (3px), `var(--radius-md)` radius, padding `var(--space-4)`. Info icon (Lucide `Info`) in `var(--dispatch)` color. Text in Body typography.
+  - `warning-callout`: Same layout as info but `var(--alert-light)` background, `var(--alert)` left border, AlertTriangle icon in `var(--alert)` color.
+  - `checklist`: List of items with interactive checkboxes. Each item has a checkbox (shadcn-style square, `var(--vest)` when checked) and label text. Items can be toggled (client-side only, no persistence). "use client" needed.
+  - `expandable`: Collapsible section using `expandableTitle` as trigger. Chevron icon rotates on open. Content revealed with height transition (`var(--duration-expand)`). Uses `var(--briefing-elevated)` background, `var(--perimeter)` border, `var(--radius-md)`.
+- No wrapper card -- content flows naturally within the lesson content area
+- "use client" directive for checklist and expandable interactivity
 
-### Step 3: Create `src/components/shared/course-card.tsx`
+### Step 3: Create `src/components/shared/quiz-question.tsx`
 
-Rich course card used on Dashboard and Catalog pages.
-
-**Props:**
-- `course: Course` -- course data object (from types.ts)
-- `showProgress?: boolean` -- show shield progress indicator (default: true)
-- `onClick?: () => void` -- card click handler (navigation)
-- `className?: string`
-
-**Implementation details:**
-- Use shadcn `Card` as base with additional styling
-- Thumbnail area: gradient placeholder based on category (each category gets a unique gradient using semantic colors -- e.g., Crowd Control = `--dispatch` gradient, EHBO = `--cleared` gradient, Brandveiligheid = `--alert` gradient)
-- Title: Heading typography (20px/600), truncate to 2 lines with `line-clamp-2`
-- Metadata row: duration (clock icon from Lucide), difficulty badge, category icon
-- Shield progress indicator (size="sm") positioned absolute at bottom-right of thumbnail area
-- Mandatory tag (amber `--vest-light` bg, `--vest` text) or Optional tag (muted `--control-bg` bg, `--uniform-tertiary` text) at top-left of thumbnail
-- Enrollment count: small text with Users icon
-- Hover: shadow transitions from `var(--shadow-lifted)` to `var(--shadow-raised)` over 150ms (`var(--duration-micro)`)
-- Surface: `var(--briefing-elevated)`, border: `var(--perimeter)`, radius: `var(--radius-lg)`
-- Padding: `var(--space-5)` for content area, no padding on thumbnail
-- Responsive: card is a flex column, works at any width from parent grid
-
-### Step 4: Create `src/components/shared/category-card.tsx`
-
-Category card with icon, used in the Catalog page category grid.
+Quiz component supporting two modes: Oefenmodus (practice) and Toetsmodus (test).
 
 **Props:**
-- `name: string` -- category name (e.g., "Crowd Control")
-- `icon: React.ReactNode` -- Lucide icon component
-- `courseCount: number` -- number of courses in category
-- `isActive?: boolean` -- whether category is currently selected as filter
-- `onClick?: () => void`
+- `questions: QuizQuestion[]` -- array of quiz questions
+- `passingScore: number` -- percentage to pass (e.g., 70)
+- `onComplete?: (score: number, passed: boolean) => void` -- callback when quiz finishes
 - `className?: string`
 
+**State management (all `useState`):**
+- `mode: "oefenmodus" | "toetsmodus"` -- current quiz mode
+- `currentIndex: number` -- current question index
+- `selectedOptionId: string | null` -- selected answer for current question
+- `answered: boolean` -- whether current question has been answered (practice mode)
+- `answers: Map<string, string>` -- all collected answers (question id -> option id)
+- `showResults: boolean` -- whether to show end results (test mode)
+
 **Implementation details:**
-- Surface: `var(--briefing-elevated)`, border: `var(--perimeter)`, radius: `var(--radius-lg)`
-- Icon: 40px container with `var(--vest-light)` background, `var(--radius-md)` radius, icon in `var(--vest)` color
-- Name: Subheading typography (16px/600)
-- Course count: Caption typography (13px/500), `var(--uniform-tertiary)` color -- e.g., "8 cursussen"
-- Hover: `var(--vest-subtle)` background, shadow to `var(--shadow-raised)`, transition 150ms
-- Active state: `var(--vest-light)` background, `var(--perimeter-emphasis)` border
-- Padding: `var(--space-5)`
-- Shadow: `var(--shadow-lifted)`
-- Cursor: pointer
 
-### Step 5: Create `src/components/shared/badge-tag.tsx`
+**Mode toggle (top of component):**
+- Two tab buttons: "Oefenmodus" and "Toetsmodus"
+- Uses shadcn Tabs component or custom toggle with `var(--vest)` active background, `var(--control-bg)` inactive
+- Toggle resets the quiz when switching modes
 
-Versatile badge/tag component with multiple variants.
+**Progress indicator:**
+- "Vraag {n} van {total}" text in Caption typography
+- Progress bar (shadcn Progress) showing completion percentage, `var(--vest)` fill
+
+**Question display:**
+- If `situationDescription` exists: render it in a callout box (`var(--dispatch-light)` bg, `var(--dispatch)` left border) above the question text
+- Question text: Heading typography (20px/600)
+- Type indicator: small badge showing "Meerkeuze" or "Waar/Niet waar"
+
+**Answer options:**
+- Radio group layout (shadcn RadioGroup)
+- Each option: card-style button with `var(--briefing-elevated)` background, `var(--perimeter)` border, `var(--radius-md)` radius
+- Hover: `var(--vest-subtle)` background
+- Selected: `var(--vest-light)` background, `var(--vest)` border
+- Option text: Body typography
+
+**Practice mode ("Oefenmodus") behavior:**
+1. User selects an option -> "Controleer" (Check) button becomes active
+2. User clicks "Controleer" -> `answered` set to true
+3. If correct: selected option turns green (`var(--cleared-light)` bg, `var(--cleared)` border), checkmark icon
+4. If incorrect: selected option turns red (`var(--alert-light)` bg, `var(--alert)` border), X icon; correct option highlighted green
+5. Explanation box appears below: `var(--briefing-elevated)` card with `var(--perimeter)` border, showing the `explanation` text with a lightbulb icon
+6. If incorrect: "Probeer opnieuw" (Try again) button resets the question. If correct: "Volgende vraag" (Next question) button
+7. After last question: show completion summary
+
+**Test mode ("Toetsmodus") behavior:**
+1. User selects an option -> "Volgende" (Next) button becomes active
+2. User clicks "Volgende" -> answer stored in `answers` map, move to next question
+3. No feedback shown per question
+4. After last question: `showResults` set to true
+
+**Results view (test mode end screen):**
+- Score: large Display typography (32px/700) showing "X van Y correct" and percentage
+- Pass/fail indicator: if score >= passingScore, green "Geslaagd!" with checkmark; if below, red "Niet geslaagd" with X icon
+- Passing score note: "Minimumscore: {passingScore}%"
+- Per-question review: list of all questions with the user's answer and correct answer. Correct answers get green check, incorrect get red X with the correct answer shown
+- "Opnieuw proberen" (Try again) button to restart the quiz
+
+**Navigation:**
+- "Vorige vraag" (Previous) and "Volgende vraag" (Next) buttons at bottom
+- Previous disabled on first question
+- On last question in test mode: button text changes to "Resultaten bekijken"
+- "use client" directive required
+
+### Step 4: Create `src/components/shared/scenario-exercise.tsx`
+
+Practical scenario exercise component for scenario-type lessons.
 
 **Props:**
-- `variant: "mandatory" | "optional" | "beginner" | "gemiddeld" | "gevorderd" | "active" | "completed" | "overdue" | "geldig" | "verloopt" | "verlopen"`
-- `children: React.ReactNode` -- label text
-- `size?: "sm" | "md"` -- sm uses Micro typography, md uses Caption (default: sm)
+- `scenario: Scenario` -- scenario data object (from types.ts)
+- `onComplete?: (score: number) => void` -- callback when completed
 - `className?: string`
 
-**Implementation details:**
-- Uses shadcn `Badge` as base with custom variant styling
-- Radius: `var(--radius-sm)` (6px)
-- Padding: `var(--space-1)` vertical, `var(--space-2)` horizontal
-- Font: Micro level (11px/600, uppercase, tracking 0.03em) for sm, Caption (13px/500) for md
-- Variant color map:
-
-| Variant | Background | Text |
-|---------|------------|------|
-| mandatory | `var(--vest-light)` | `var(--vest-hover)` |
-| optional | `var(--control-bg)` | `var(--uniform-tertiary)` |
-| beginner | `var(--cleared-light)` | `var(--cleared)` |
-| gemiddeld | `var(--caution-light)` | `var(--vest-hover)` |
-| gevorderd | `var(--alert-light)` | `var(--alert)` |
-| active | `var(--dispatch-light)` | `var(--dispatch)` |
-| completed | `var(--cleared-light)` | `var(--cleared)` |
-| overdue | `var(--alert-light)` | `var(--alert)` |
-| geldig | `var(--cleared-light)` | `var(--cleared)` |
-| verloopt | `var(--caution-light)` | `var(--vest-hover)` |
-| verlopen | `var(--alert-light)` | `var(--alert)` |
-
-### Step 6: Create `src/components/shared/stats-card.tsx`
-
-Statistic display card used on the Dashboard.
-
-**Props:**
-- `label: string` -- stat label (e.g., "Cursussen Voltooid")
-- `value: string | number` -- the stat value
-- `icon?: React.ReactNode` -- optional Lucide icon
-- `trend?: { direction: "up" | "down"; value: string }` -- optional trend indicator (e.g., "+12%")
-- `className?: string`
+**State management:**
+- `selectedOptionId: string | null` -- selected response
+- `submitted: boolean` -- whether response has been submitted
+- `showExpert: boolean` -- whether expert explanation is expanded
 
 **Implementation details:**
-- Surface: `var(--briefing-elevated)`, border: `var(--perimeter)`, radius: `var(--radius-lg)`
-- Value: Display typography (32px/700, tracking -0.02em) in `var(--uniform)` color
-- Label: Caption typography (13px/500) in `var(--uniform-tertiary)` color
-- Icon: placed top-right, 40px container with `var(--vest-light)` bg, `var(--radius-md)` radius, icon in `var(--vest)` color
-- Trend indicator: small text below value -- green (`--cleared`) with ArrowUp icon for "up", red (`--alert`) with ArrowDown icon for "down"
-- Padding: `var(--space-5)`
-- Shadow: `var(--shadow-lifted)`
-- Layout: icon top-right, value large below, label below value, trend indicator at bottom
 
-### Step 7: Create `src/components/shared/leaderboard-row.tsx`
+**Situation section:**
+- If `eventContext` exists: small badge at top showing context (e.g., "Lowlands Festival, hoofdingang Alpha Stage") using BadgeTag variant="active"
+- Title: Display typography or large Heading (24px/700)
+- Situation description: Body typography (15px/400), `var(--uniform-secondary)`, in a bordered card (`var(--briefing-elevated)` bg, `var(--perimeter)` border, `var(--radius-lg)`)
 
-Single leaderboard entry row used on the Dashboard.
+**Response options:**
+- Card-style options (like quiz but larger): each option is a selectable card with `var(--briefing-elevated)` bg, `var(--perimeter)` border, `var(--radius-lg)` radius
+- Each option shows the option letter (A, B, C, D) in a circle at left, option text at right
+- Hover: `var(--vest-subtle)` bg
+- Selected: `var(--vest-light)` bg, `var(--vest)` border
 
-**Props:**
-- `rank: number` -- position (1-based)
-- `name: string` -- guard name
-- `avatarInitials: string` -- 2-letter initials for avatar
-- `points: number` -- total points
-- `badgeCount: number` -- number of badges earned
-- `streak: number` -- current day streak
-- `isCurrentUser?: boolean` -- highlight this row
-- `className?: string`
+**Submit button:**
+- "Bekijk resultaat" (View result) -- disabled until option selected
+- `var(--vest)` background, white text
 
-**Implementation details:**
-- Full-width row, flex layout, vertically centered items
-- Rank: ranks 1-3 get medal icons (gold/silver/bronze using `--vest` / `--uniform-tertiary` / `--vest-hover` colors), ranks 4+ show number in `var(--uniform-tertiary)`
-- Avatar: shadcn `Avatar` with initials fallback, 36px, `var(--vest-light)` background
-- Name: Subheading typography (16px/600)
-- Points: Body typography, `var(--uniform-secondary)`, with small trophy icon
-- Badge count: Caption typography with shield icon
-- Streak: Caption typography with flame icon (Lucide `Flame`), `var(--vest)` color
-- Current user row: `var(--vest-subtle)` background, `var(--perimeter-emphasis)` left border (3px)
-- Padding: `var(--space-3)` vertical, `var(--space-4)` horizontal
-- Border-bottom: `var(--perimeter-soft)` between rows
-- Radius: `var(--radius-md)` for current user row
+**After submission -- feedback:**
+- Selected option card updates: background becomes colored based on score
+  - score >= 80: `var(--cleared-light)` bg, `var(--cleared)` border
+  - score 40-79: `var(--caution-light)` bg, `var(--vest)` border
+  - score < 40: `var(--alert-light)` bg, `var(--alert)` border
+- The option's individual `feedback` text appears inside the selected card
+- All other options also show their feedback text and score in muted style
+- Best option highlighted with a star icon
 
-### Step 8: Create `src/components/shared/cert-card.tsx`
+**Score indicator:**
+- Circular or shield indicator showing the score (0-100) from the selected option
+- Color matched to score range (green/amber/red as above)
+- "Jouw score: {score}/100" text
 
-Certification card with expiry status used on the Profile page.
+**Expert explanation section:**
+- Collapsible card below the options: "Uitleg van de expert" header
+- `expertExplanation` text in Body typography
+- `var(--dispatch-light)` background, `var(--dispatch)` left border
+- Auto-expanded after submission
 
-**Props:**
-- `name: string` -- certification name
-- `issuingBody: string` -- issuing organization
-- `earnedDate: string` -- date earned (formatted)
-- `expiryDate: string` -- expiry date (formatted)
-- `status: "geldig" | "verloopt" | "verlopen"` -- validity status
-- `className?: string`
+**"use client" directive required**
 
-**Implementation details:**
-- Surface: `var(--briefing-elevated)`, border: `var(--perimeter)`, radius: `var(--radius-lg)`
-- Shield icon (from Lucide `ShieldCheck`) at top-left, colored by status: `var(--cleared)` for geldig, `var(--vest)` for verloopt, `var(--alert)` for verlopen
-- Cert name: Heading typography (20px/600)
-- Issuing body: Caption typography (13px/500), `var(--uniform-tertiary)`
-- Dates section: two columns -- "Behaald" (earned) and "Verloopt" (expires), Caption typography
-- Status badge (using BadgeTag component): geldig/verloopt/verlopen
-- Expiry countdown: if verloopt, show "Verloopt over X dagen" in `var(--vest)` color; if verlopen, show "Verlopen X dagen geleden" in `var(--alert)` color
-- Padding: `var(--space-5)`
-- Shadow: `var(--shadow-lifted)`
-- Border-left: 3px solid, colored by status (same as shield icon colors)
+### Step 5: Create `src/app/cursus/[id]/page.tsx`
 
-### Step 9: Create `src/components/shared/deployment-card.tsx`
+The main course detail page. This is the most complex file -- it ties everything together.
 
-Past deployment entry card used on the Profile page.
+**Architecture: "use client" page component**
 
-**Props:**
-- `eventName: string`
-- `dateRange: string` -- formatted date range (e.g., "15-17 jul 2025")
-- `location: string`
-- `role: string` -- guard's role at the event
-- `linkedCourses: Array<{ id: string; title: string; completed: boolean }>`
-- `className?: string`
+The page receives `params.id`, finds the course from mock data, manages lesson navigation state, and renders the appropriate content component.
 
-**Implementation details:**
-- Surface: `var(--briefing-elevated)`, border: `var(--perimeter)`, radius: `var(--radius-lg)`
-- Event name: Heading typography (20px/600)
-- Date range: Caption typography (13px/500), `var(--uniform-tertiary)`, with Calendar icon (Lucide)
-- Location: Caption typography, `var(--uniform-secondary)`, with MapPin icon (Lucide)
-- Role: BadgeTag component with "active" variant showing the role
-- Linked courses section: small list of course names with shield mini-icons (green check for completed, amber partial for in-progress)
-- Padding: `var(--space-5)`
-- Shadow: `var(--shadow-lifted)`
-- Layout: flex column, with course list at bottom separated by `var(--perimeter-soft)` divider
+**Imports:**
+- `courses` from `@/data/mock/courses`
+- `quizQuestions` from `@/data/mock/quiz-questions`
+- `scenarios` from `@/data/mock/scenarios`
+- All 4 content components (VideoPlayerPlaceholder, ReadingContent, QuizQuestion, ScenarioExercise)
+- ShieldProgress, BadgeTag from shared components
+- Lucide icons: Video, BookOpen, HelpCircle, Target, ChevronLeft, ChevronRight, ChevronDown, Play, Clock, Layers, ArrowLeft
+- `use` from React (for unwrapping params promise)
+- `useState` from React
 
-### Step 10: Verify all components
+**State:**
+- `activeLessonId: string` -- currently active lesson ID (default: first lesson of first module)
+- `sidebarOpen: boolean` -- mobile sidebar/accordion open state
+- `expandedModuleIds: Set<string>` -- which modules are expanded in the sidebar (default: module containing active lesson)
+
+**Page sections:**
+
+**A. Course Header (top):**
+- Back link: "Terug naar catalogus" with ArrowLeft icon, links to `/catalogus`
+- Course title: large heading (24px/700)
+- Metadata row: category badge (BadgeTag), difficulty badge, mandatory/optional badge, duration with Clock icon, module count with Layers icon
+- Overall progress: ShieldProgress (size="lg") with percentage label
+- CTA button: "Start cursus" (if not started) or "Ga verder" (if in progress) or "Voltooid" (if completed), `var(--vest)` background
+
+**B. Two-column layout (desktop: sidebar + content, mobile: stacked):**
+
+**B1. Module Sidebar (desktop) / Accordion (mobile):**
+- Desktop (>=768px): fixed-width left sidebar (280px), scrollable, sticky
+- Mobile (<768px): collapsible accordion above the content area
+
+- Module list: each module is a collapsible section
+  - Module header: click to expand/collapse. Shows module order number, title, lesson count, and a small progress indicator (completed lessons / total lessons)
+  - ChevronDown icon rotates when expanded, transition `var(--duration-state)`
+  - Module containing the active lesson is expanded by default
+
+- Lesson list (within expanded module):
+  - Each lesson is a clickable row
+  - Left: shield mini-icon (ShieldProgress size="sm"):
+    - `completionStatus === 'completed'` -> variant="complete", progress=100
+    - `completionStatus === 'in-progress'` -> variant="default", progress=50
+    - `completionStatus === 'not-started'` -> variant="default", progress=0
+  - Center: lesson title in Caption typography
+  - Right: type icon (Lucide icons):
+    - video -> `Video` icon
+    - reading -> `BookOpen` icon
+    - quiz -> `HelpCircle` icon
+    - scenario -> `Target` icon
+  - Active lesson: `var(--vest-light)` background, `var(--vest)` left border (3px), font-weight 600
+  - Completed lesson: title in `var(--uniform-tertiary)` (muted)
+  - Duration: small text below title showing minutes
+
+- Sidebar surface: `var(--briefing-elevated)` bg, `var(--perimeter)` right border (desktop), `var(--radius-lg)` for mobile accordion cards
+
+**B2. Lesson Content Area (main):**
+- Renders the active lesson's content based on `lesson.type`
+- Lesson header at top: lesson title (Heading, 20px/600), lesson type badge, duration
+
+- **Video lesson:** Render `<VideoPlayerPlaceholder>` with the lesson title and duration. Generate chapter data inline:
+  ```
+  chapters: [
+    { title: "Introductie", startTime: 0 },
+    { title: "Kernconcepten", startTime: Math.floor(durationMinutes * 60 * 0.3) },
+    { title: "Samenvatting", startTime: Math.floor(durationMinutes * 60 * 0.8) },
+  ]
+  ```
+
+- **Reading lesson:** Render `<ReadingContent>` with inline-generated sections. Create a helper function `generateReadingSections(lessonTitle: string): ReadingSection[]` that produces plausible Dutch content based on the lesson title. Generate 5-7 sections per lesson: heading, 2 paragraphs, bullet list, info-callout, checklist, expandable. All text in Dutch and contextually relevant to the lesson title/topic.
+
+- **Quiz lesson:** Filter `quizQuestions` by `courseId` matching the current course. Render `<QuizQuestion>` with those questions and `passingScore: 70`.
+
+- **Scenario lesson:** Filter `scenarios` by `courseId` matching the current course. Render `<ScenarioExercise>` with the first matching scenario.
+
+**C. Lesson Navigation (bottom of content area):**
+- Two buttons: "Vorige les" (Previous) and "Volgende les" (Next)
+- Previous: disabled on the first lesson of the first module, uses ChevronLeft icon
+- Next: disabled on the last lesson of the last module, uses ChevronRight icon
+- Navigation crosses module boundaries (last lesson of module N -> first lesson of module N+1)
+- Progress bar for current module: thin bar showing how many lessons in the current module are completed
+- Clicking next/previous updates `activeLessonId` and scrolls to top of content area
+
+**Helper functions within the page:**
+- `findLessonById(id: string)`: returns `{ module, lesson, moduleIndex, lessonIndex }` for the given lesson ID
+- `getAdjacentLesson(direction: 'prev' | 'next')`: returns the previous or next lesson ID, crossing module boundaries
+- `getLessonTypeIcon(type: LessonType)`: returns the appropriate Lucide icon component
+- `generateReadingSections(title: string)`: generates plausible reading content sections based on lesson title
+
+### Step 6: Verify the implementation
 
 - Run `npx tsc --noEmit` to verify TypeScript compilation
 - Run `npm run build` to verify build succeeds
-- Search codebase for hardcoded values: no hex colors, no `rgb()`, no raw `px` values outside of the design system (shield SVG path coordinates are acceptable)
-- Verify each component imports from `@/lib/utils` for `cn()` helper
-- Verify each component is a named export (not default export) for tree-shaking
+- Verify no hardcoded color values in any of the 5 files
+- Verify all components use design system tokens
+- Verify responsive behavior: sidebar becomes accordion on mobile (<768px)
+- Verify quiz both modes work correctly
 
 ---
 
-## Files Created
+## Files Created/Modified
 
 | File | Purpose |
 |------|---------|
-| `src/components/shared/shield-progress.tsx` | Signature shield-shaped SVG progress indicator with animated fill |
-| `src/components/shared/deployment-readiness.tsx` | Event deployment readiness bar with shield indicators |
-| `src/components/shared/course-card.tsx` | Rich course card with thumbnail, metadata, shield progress, tags |
-| `src/components/shared/category-card.tsx` | Category card with icon, name, course count for catalog grid |
-| `src/components/shared/badge-tag.tsx` | Versatile badge/tag with 11 semantic variants |
-| `src/components/shared/stats-card.tsx` | Statistic display card with value, label, trend, icon |
-| `src/components/shared/leaderboard-row.tsx` | Leaderboard entry row with rank, avatar, points, streak |
-| `src/components/shared/cert-card.tsx` | Certification card with expiry status and countdown |
-| `src/components/shared/deployment-card.tsx` | Past deployment entry with event info and linked courses |
+| `src/components/shared/video-player-placeholder.tsx` | Placeholder 16:9 video player with controls UI, chapters, "niet beschikbaar in demo" message |
+| `src/components/shared/reading-content.tsx` | Rich text renderer for headings, paragraphs, bullets, callouts, checklists, expandables |
+| `src/components/shared/quiz-question.tsx` | Quiz with Oefenmodus (practice, instant feedback) and Toetsmodus (test, end results) |
+| `src/components/shared/scenario-exercise.tsx` | Practical scenario with situation, response options, score, expert explanation |
+| `src/app/cursus/[id]/page.tsx` | Course detail page with module sidebar/accordion, lesson content, navigation |
+
+## Files NOT Modified
+
+- `src/lib/types.ts` -- existing types are sufficient (ReadingSection, QuizQuestion, Scenario, etc.)
+- `src/data/mock/*` -- no changes to mock data files
+- `src/components/layout/*` -- no changes to layout shell
+- `src/components/shared/shield-progress.tsx` -- reused as-is
+- `src/components/shared/badge-tag.tsx` -- reused as-is
 
 ## Test Cases
 
 1. **TypeScript compiles**: `npx tsc --noEmit` passes with no errors
 2. **Build succeeds**: `npm run build` completes successfully
-3. **No hardcoded colors**: `grep -rn "rgb\|rgba\|#[0-9a-fA-F]" src/components/shared/` returns no matches (except SVG path data)
-4. **Shield animates**: ShieldProgress with `progress={75}` shows fill animation on initial render
-5. **Shield variants**: ShieldProgress with variant="complete" renders green, variant="overdue" renders red
-6. **Badge variants**: All 11 BadgeTag variants render with correct background/text colors
-7. **Course card hover**: CourseCard shadow transitions on hover (inspect with dev tools)
-8. **Responsive**: All components render without overflow at 375px viewport width
-9. **Cert card status**: CertCard with status="verloopt" shows amber warning styling and countdown text
-10. **Leaderboard current user**: LeaderboardRow with isCurrentUser=true has highlighted background
+3. **Route works**: navigating to `/cursus/course-crowd-control` renders the course detail page
+4. **Module sidebar**: all modules listed with correct lesson counts; clicking a lesson updates the content area
+5. **Lesson type rendering**: video lessons show video placeholder, reading lessons show rich content, quiz lessons show quiz component, scenario lessons show scenario component
+6. **Quiz practice mode**: selecting an answer and clicking "Controleer" shows immediate feedback (green/red), explanation text, retry button for wrong answers
+7. **Quiz test mode**: selecting answers and clicking "Volgende" collects answers without feedback; after last question, results screen shows score, pass/fail, per-question review
+8. **Quiz mode toggle**: switching between Oefenmodus and Toetsmodus resets the quiz
+9. **Scenario exercise**: selecting a response and clicking "Bekijk resultaat" shows feedback for all options, score indicator, and expert explanation
+10. **Lesson navigation**: "Vorige les" and "Volgende les" buttons navigate correctly, crossing module boundaries
+11. **Mobile responsive**: at <768px, sidebar collapses to accordion; at >=768px, sidebar is a fixed left panel
+12. **Active lesson highlight**: the active lesson in the sidebar has amber background and left border
+13. **Shield completion states**: completed lessons show full green shield, in-progress show half amber, not-started show empty
+14. **Course not found**: navigating to `/cursus/nonexistent-id` shows a friendly "Cursus niet gevonden" message
+15. **No hardcoded colors**: no hex values, rgb(), or raw px outside design system in any of the 5 new files
 
 ## Notes
 
-- TES-46 (types) must be merged before implementation starts. Components import `Course` and other types from `@/lib/types`
-- All components are client components (`"use client"`) since they use hooks (useState, useEffect) or event handlers
-- ShieldProgress uses `useEffect`+`useState` for mount animation -- initial render at 0, then animate to target
-- The shield SVG path should be a simple, recognizable shield shape. Use a basic 5-point path: pointed bottom, curved sides, flat/slightly curved top
-- Category-to-gradient mapping for course card thumbnails should be defined as a constant object within the component or in constants.ts
-- Components that don't need interactivity (like CertCard, DeploymentCard) can be server components -- only add "use client" where truly needed
-- Use `cn()` from `@/lib/utils` for all conditional class composition
-- Use Lucide icons exclusively (already installed via TES-45)
+- All 4 content components need "use client" directive since they manage local state
+- The page component itself needs "use client" for lesson navigation state and `use()` to unwrap params
+- Reading content is generated inline (no mock data exists for it) -- the `generateReadingSections` helper creates contextually relevant Dutch content based on lesson title
+- Quiz questions are matched to courses by `courseId` field -- not all courses have quiz questions in the mock data. If no questions match, show a "Geen vragen beschikbaar" message
+- Similarly for scenarios -- not all courses have scenarios. Show "Geen scenario beschikbaar" if no match
+- The module sidebar width (280px) is a fixed value on desktop; on mobile it becomes full-width accordion
+- Lesson navigation crosses module boundaries seamlessly
 - All user-facing text is in Dutch
+- Use `cn()` from `@/lib/utils` for all conditional class composition
+- Use Lucide icons exclusively
+- Use design system CSS variables exclusively -- no hardcoded colors or spacing
