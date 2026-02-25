@@ -1,297 +1,285 @@
-# PLAN: TES-48 Shared UI Components
+# PLAN: TES-51 Course Catalog Page
 
 ## Objective
 
-Build 9 shared UI components used across multiple pages (Dashboard, Catalog, Course Detail, Profile). Every component uses design system tokens exclusively -- no hardcoded colors, spacing, or font sizes. The shield progress indicator is the signature element of the product.
+Build the Course Catalog page (`/catalogus`) with search, multi-filter support, category browsing, a recommended section, and a responsive course grid. Also create a reusable `search-filter-bar` component. Guards should quickly find relevant training -- especially mandatory courses for upcoming deployments.
 
 ## Dependencies
 
 - **TES-45** (merged): Project scaffolding, design system tokens in `globals.css`, shadcn/ui base components
-- **TES-46** (must be merged before coding starts): TypeScript types in `src/lib/types.ts` and constants in `src/lib/constants.ts` -- components import these types for props
+- **TES-46** (merged): TypeScript types (`src/lib/types.ts`), constants (`src/lib/constants.ts`), mock data (`src/data/mock/courses.ts`, `src/data/mock/events.ts`, `src/data/mock/guards.ts`)
+- **TES-47** (merged): Layout shell (`src/components/layout/layout-shell.tsx`), sidebar, bottom tabs, top bar
+- **TES-48** (merged): Shared components -- `CourseCard`, `CategoryCard`, `BadgeTag`, `ShieldProgress`
 
 ## Acceptance Criteria
 
-- Shield progress animates fill on mount using a CSS transition (not just a static fill)
-- All components are responsive -- render correctly at 375px and 1280px widths
-- Components use design system tokens exclusively -- no hardcoded colors, spacing, or font sizes (verify by searching for hex values, `rgb()`, raw px values)
+- Search filters courses by title and description in real-time (client-side, case-insensitive)
+- Filters work in combination -- selecting a category AND a difficulty level narrows results correctly
+- When filters produce no results, a friendly empty state is shown: "Geen cursussen gevonden" with a suggestion to broaden filters
 
 ---
 
 ## Implementation Steps
 
-### Step 0: Merge TES-46 into this branch
+### Step 0: Read the design system
 
-Before any component work, merge the TES-46 branch (types + mock data) into this branch so that `src/lib/types.ts` and `src/lib/constants.ts` are available for component prop typing.
+Read `.interface-design/system.md` and verify all design tokens are available. Confirm existing components (`CourseCard`, `CategoryCard`, `BadgeTag`) match the design system.
 
-```bash
-git merge origin/tes-46-foundation-typescript-types-mock-data-layer
+### Step 1: Create `src/components/shared/search-filter-bar.tsx`
+
+A combined search input + filter controls component. Reusable across pages.
+
+**Props:**
+- `searchQuery: string` -- current search value
+- `onSearchChange: (query: string) => void` -- search change handler
+- `filters: FilterState` -- current filter state object
+- `onFilterChange: (filters: FilterState) => void` -- filter change handler
+- `courseCount: number` -- total filtered results count for display
+- `className?: string`
+
+**FilterState type** (define in the component file or inline):
+```ts
+interface FilterState {
+  category: CourseCategory | null;
+  difficulty: DifficultyLevel | null;
+  type: 'all' | 'mandatory' | 'optional';
+  status: CourseStatus | null;
+}
 ```
 
-### Step 1: Create `src/components/shared/shield-progress.tsx`
-
-The signature element. An SVG shield shape with an animated fill level.
-
-**Props:**
-- `progress: number` -- 0-100 fill percentage
-- `size?: "sm" | "md" | "lg"` -- sm=32px, md=48px, lg=64px (default: md)
-- `variant?: "default" | "complete" | "overdue"` -- default=amber (`--vest`), complete=green (`--cleared`), overdue=red (`--alert`)
-- `showLabel?: boolean` -- show percentage number inside shield (default: false)
-- `icon?: React.ReactNode` -- optional icon overlay instead of percentage
-- `className?: string`
-
 **Implementation details:**
-- SVG `<path>` defining a shield silhouette (simple, recognizable -- not ornate heraldry)
-- `<clipPath>` using the shield path to clip a filled rectangle
-- Fill rectangle height animated from 0% to `progress`% on mount via CSS transition (`transition: height var(--duration-expand) ease-in-out`)
-- Use `useEffect` + `useState` pattern: render at 0%, then set to target on mount to trigger animation
-- Colors from design system tokens: `var(--vest)` default, `var(--cleared)` complete, `var(--alert)` overdue
-- Shield outline stroke uses `var(--perimeter)`
-- Label text (if shown) uses `var(--uniform)` color, Caption typography (13px, weight 500)
+- `"use client"` -- uses controlled input state and event handlers
+- Search bar: shadcn `Input` with Search icon (Lucide `Search`), placeholder "Zoek een cursus...", full width on mobile, max-width ~480px on desktop
+- Filter controls: row of dropdown/select buttons for each filter dimension:
+  - **Categorie**: all 6 categories from `CATEGORIES` constant, plus "Alle" option
+  - **Niveau**: Beginner / Gemiddeld / Gevorderd from `DIFFICULTY_LEVELS`, plus "Alle" option
+  - **Type**: Alles / Verplicht / Optioneel (hardcoded, not from constants)
+  - **Status**: Alle / Niet gestart / Bezig / Voltooid from `COURSE_STATUSES`
+- Each filter renders as a styled `<select>` element using design system tokens for simplicity
+- **Active filters as dismissible chips**: below the filter row, render a chip for each active (non-default) filter. Each chip shows the filter label and an X button (Lucide `X` icon) to clear that specific filter. Use `BadgeTag` variant="active" as the chip base with an added X button.
+- Responsive layout: on mobile (<768px), search input full-width on its own row, filters wrap below. On desktop, search + filters on one or two rows.
+- Colors: input border `var(--control-border)`, focus ring `var(--perimeter-focus)`, filter buttons use `var(--control-bg)` background
+- Spacing: `var(--space-3)` gap between filter elements, `var(--space-4)` gap between search row and filter row
 
-**Size map:**
-| Size | Width | Height | Label font |
-|------|-------|--------|------------|
-| sm   | 24px  | 28px   | Micro (11px) |
-| md   | 36px  | 42px   | Caption (13px) |
-| lg   | 48px  | 56px   | Body (15px) |
+### Step 2: Create `src/app/catalogus/page.tsx`
 
-### Step 2: Create `src/components/shared/deployment-readiness.tsx`
+Replace the existing placeholder with the full catalog page. This is a `"use client"` component because it uses `useState` and `useMemo` for filtering.
 
-Horizontal bar showing readiness for an upcoming event deployment.
+**State:**
+```ts
+const [searchQuery, setSearchQuery] = useState('');
+const [filters, setFilters] = useState<FilterState>({
+  category: null,
+  difficulty: null,
+  type: 'all',
+  status: null,
+});
+```
 
-**Props:**
-- `eventName: string` -- event name (e.g., "Lowlands Festival")
-- `eventDate: string` -- formatted date string
-- `courses: Array<{ id: string; title: string; progress: number; required: boolean }>` -- required courses with their progress
-- `status: "gereed" | "bezig" | "verlopen"` -- overall readiness status
-- `className?: string`
+**Filtering logic** (in a `useMemo`):
+```ts
+const filteredCourses = useMemo(() => {
+  return courses.filter(course => {
+    // Search: match title OR description, case-insensitive
+    const query = searchQuery.toLowerCase();
+    if (query && !course.title.toLowerCase().includes(query) && !course.description.toLowerCase().includes(query)) {
+      return false;
+    }
+    // Category filter
+    if (filters.category && course.category !== filters.category) return false;
+    // Difficulty filter
+    if (filters.difficulty && course.difficulty !== filters.difficulty) return false;
+    // Type filter (mandatory/optional)
+    if (filters.type === 'mandatory' && !course.isMandatory) return false;
+    if (filters.type === 'optional' && course.isMandatory) return false;
+    // Status filter
+    if (filters.status && course.status !== filters.status) return false;
+    return true;
+  });
+}, [searchQuery, filters]);
+```
 
-**Implementation details:**
-- Full-width card with `var(--briefing-elevated)` surface, `var(--perimeter)` border, `var(--radius-lg)` radius
-- Left side: event name (Heading typography, 20px/600) + date (Caption typography, 13px/500, `var(--uniform-tertiary)`)
-- Right side: row of small ShieldProgress components (size="sm") for each required course, with tooltip showing course title
-- Status badge at far right: "Gereed" (green `--cleared`), "Bezig" (amber `--vest`), "Verlopen" (red `--alert`)
-- When status is "gereed", subtle amber gradient background (`var(--vest-subtle)` to transparent)
-- Responsive: on mobile (<768px), stack vertically -- event info on top, shields in a row below, status badge below shields
-- Shadow: `var(--shadow-lifted)`
+**Page sections (top to bottom):**
 
-### Step 3: Create `src/components/shared/course-card.tsx`
+#### Section 1: Page Header
+- Title: "Cursuscatalogus" -- use large heading (e.g., 28px/700, `var(--uniform)`)
+- Subtitle: total course count -- e.g., "15 cursussen beschikbaar" using Caption typography (13px/500, `var(--uniform-tertiary)`)
+- Padding: `var(--space-6)` bottom margin
 
-Rich course card used on Dashboard and Catalog pages.
+#### Section 2: Search + Filters
+- Render the `SearchFilterBar` component with state bindings
+- Margin bottom: `var(--space-8)`
 
-**Props:**
-- `course: Course` -- course data object (from types.ts)
-- `showProgress?: boolean` -- show shield progress indicator (default: true)
-- `onClick?: () => void` -- card click handler (navigation)
-- `className?: string`
+#### Section 3: Aanbevolen voor jou (Recommended for You)
+- Only shown when no search query is active and no filters are applied (default state)
+- Show 3-4 courses that are recommended based on:
+  1. Mandatory courses for upcoming events that are not yet completed (highest priority)
+  2. Courses in categories where the guard has low completion (secondary)
+- Each recommended course card uses the existing `CourseCard` component wrapped in a container that adds a **reason tag** below or overlaying the card -- e.g., "Verplicht voor Koningsdag", "Versterk je EHBO kennis"
+- Reason tags: use `BadgeTag` variant="mandatory" for event-linked, variant="active" for skill-based
+- Layout: horizontal scroll on mobile, 4-column grid on desktop (or 3 if only 3 recommendations)
+- Section title: "Aanbevolen voor jou" -- Heading typography
+- Margin bottom: `var(--space-8)`
 
-**Implementation details:**
-- Use shadcn `Card` as base with additional styling
-- Thumbnail area: gradient placeholder based on category (each category gets a unique gradient using semantic colors -- e.g., Crowd Control = `--dispatch` gradient, EHBO = `--cleared` gradient, Brandveiligheid = `--alert` gradient)
-- Title: Heading typography (20px/600), truncate to 2 lines with `line-clamp-2`
-- Metadata row: duration (clock icon from Lucide), difficulty badge, category icon
-- Shield progress indicator (size="sm") positioned absolute at bottom-right of thumbnail area
-- Mandatory tag (amber `--vest-light` bg, `--vest` text) or Optional tag (muted `--control-bg` bg, `--uniform-tertiary` text) at top-left of thumbnail
-- Enrollment count: small text with Users icon
-- Hover: shadow transitions from `var(--shadow-lifted)` to `var(--shadow-raised)` over 150ms (`var(--duration-micro)`)
-- Surface: `var(--briefing-elevated)`, border: `var(--perimeter)`, radius: `var(--radius-lg)`
-- Padding: `var(--space-5)` for content area, no padding on thumbnail
-- Responsive: card is a flex column, works at any width from parent grid
+**Recommendation logic:**
+```ts
+const recommendations = useMemo(() => {
+  const upcomingEvents = events.filter(e => e.status === 'upcoming');
+  const recs: Array<{ course: Course; reason: string }> = [];
 
-### Step 4: Create `src/components/shared/category-card.tsx`
+  // Priority 1: Mandatory incomplete courses for upcoming events
+  for (const event of upcomingEvents) {
+    for (const courseId of event.requiredCourseIds) {
+      const course = courses.find(c => c.id === courseId && c.status !== 'completed');
+      if (course && !recs.find(r => r.course.id === course.id)) {
+        recs.push({ course, reason: `Verplicht voor ${event.name}` });
+      }
+      if (recs.length >= 4) break;
+    }
+    if (recs.length >= 4) break;
+  }
 
-Category card with icon, used in the Catalog page category grid.
+  // Priority 2: Fill remaining slots with courses in weak categories
+  if (recs.length < 4) {
+    const notEnrolled = courses.filter(
+      c => !currentGuard.enrolledCourseIds.includes(c.id) && !recs.find(r => r.course.id === c.id)
+    );
+    for (const course of notEnrolled) {
+      const catLabel = CATEGORIES.find(cat => cat.id === course.category)?.label;
+      recs.push({ course, reason: `Versterk je ${catLabel} kennis` });
+      if (recs.length >= 4) break;
+    }
+  }
 
-**Props:**
-- `name: string` -- category name (e.g., "Crowd Control")
-- `icon: React.ReactNode` -- Lucide icon component
-- `courseCount: number` -- number of courses in category
-- `isActive?: boolean` -- whether category is currently selected as filter
-- `onClick?: () => void`
-- `className?: string`
+  return recs;
+}, []);
+```
 
-**Implementation details:**
-- Surface: `var(--briefing-elevated)`, border: `var(--perimeter)`, radius: `var(--radius-lg)`
-- Icon: 40px container with `var(--vest-light)` background, `var(--radius-md)` radius, icon in `var(--vest)` color
-- Name: Subheading typography (16px/600)
-- Course count: Caption typography (13px/500), `var(--uniform-tertiary)` color -- e.g., "8 cursussen"
-- Hover: `var(--vest-subtle)` background, shadow to `var(--shadow-raised)`, transition 150ms
-- Active state: `var(--vest-light)` background, `var(--perimeter-emphasis)` border
-- Padding: `var(--space-5)`
-- Shadow: `var(--shadow-lifted)`
-- Cursor: pointer
+#### Section 4: Categorieen (Categories)
+- Only shown when no category filter is active (hide when a category is already selected to avoid redundancy)
+- Grid of 6 `CategoryCard` components, one per category from `CATEGORIES`
+- Course count per category: computed from `courses` array by filtering per category
+- Clicking a category card sets `filters.category` to that category
+- The active category card uses `isActive` prop
+- Grid: 3 columns on desktop, 2 columns on tablet, 2 columns on mobile
+- Gap: `var(--space-4)`
+- Section title: "Categorieen" -- Heading typography
+- Margin bottom: `var(--space-8)`
 
-### Step 5: Create `src/components/shared/badge-tag.tsx`
+**Category counts:**
+```ts
+const categoryCounts = useMemo(() => {
+  const counts: Record<string, number> = {};
+  for (const cat of CATEGORIES) {
+    counts[cat.id] = courses.filter(c => c.category === cat.id).length;
+  }
+  return counts;
+}, []);
+```
 
-Versatile badge/tag component with multiple variants.
+#### Section 5: Alle Cursussen (All Courses)
+- Section title: "Alle Cursussen" with filtered count -- e.g., "Alle Cursussen (12)"
+- Grid of `CourseCard` components rendered from `filteredCourses`
+- Each card's `onClick` navigates to `/cursus/${course.id}` using Next.js `useRouter`
+- Grid: 3 columns desktop (>=1024px), 2 columns tablet (>=768px), 1 column mobile (<768px)
+- Gap: `var(--space-5)`
+- Uses CSS grid with responsive columns
 
-**Props:**
-- `variant: "mandatory" | "optional" | "beginner" | "gemiddeld" | "gevorderd" | "active" | "completed" | "overdue" | "geldig" | "verloopt" | "verlopen"`
-- `children: React.ReactNode` -- label text
-- `size?: "sm" | "md"` -- sm uses Micro typography, md uses Caption (default: sm)
-- `className?: string`
+#### Section 6: Empty State
+- Shown when `filteredCourses.length === 0`
+- Centered container with:
+  - Search icon (Lucide `SearchX` or `Search` with muted color), size 48
+  - Title: "Geen cursussen gevonden" -- Heading typography, `var(--uniform)`
+  - Subtitle: "Probeer andere zoektermen of pas je filters aan" -- Body typography, `var(--uniform-tertiary)`
+  - "Wis alle filters" button (shadcn `Button` variant="outline") that resets search and all filters
+- Padding: `var(--space-16)` vertical
+- Background: `var(--briefing-elevated)`, radius: `var(--radius-lg)`, border: `var(--perimeter)`
 
-**Implementation details:**
-- Uses shadcn `Badge` as base with custom variant styling
-- Radius: `var(--radius-sm)` (6px)
-- Padding: `var(--space-1)` vertical, `var(--space-2)` horizontal
-- Font: Micro level (11px/600, uppercase, tracking 0.03em) for sm, Caption (13px/500) for md
-- Variant color map:
+### Step 3: Wire up Lucide icons for categories
 
-| Variant | Background | Text |
-|---------|------------|------|
-| mandatory | `var(--vest-light)` | `var(--vest-hover)` |
-| optional | `var(--control-bg)` | `var(--uniform-tertiary)` |
-| beginner | `var(--cleared-light)` | `var(--cleared)` |
-| gemiddeld | `var(--caution-light)` | `var(--vest-hover)` |
-| gevorderd | `var(--alert-light)` | `var(--alert)` |
-| active | `var(--dispatch-light)` | `var(--dispatch)` |
-| completed | `var(--cleared-light)` | `var(--cleared)` |
-| overdue | `var(--alert-light)` | `var(--alert)` |
-| geldig | `var(--cleared-light)` | `var(--cleared)` |
-| verloopt | `var(--caution-light)` | `var(--vest-hover)` |
-| verlopen | `var(--alert-light)` | `var(--alert)` |
+The `CATEGORIES` constant stores icon names as strings (e.g., `"Users"`, `"Heart"`). In the catalog page, map these strings to actual Lucide components for the `CategoryCard` icon prop:
 
-### Step 6: Create `src/components/shared/stats-card.tsx`
+```ts
+import { Users, Heart, MessageSquare, ShieldCheck, Flame, Siren } from 'lucide-react';
 
-Statistic display card used on the Dashboard.
+const categoryIconMap: Record<string, React.ReactNode> = {
+  Users: <Users size={20} />,
+  Heart: <Heart size={20} />,
+  MessageSquare: <MessageSquare size={20} />,
+  ShieldCheck: <ShieldCheck size={20} />,
+  Flame: <Flame size={20} />,
+  Siren: <Siren size={20} />,
+};
+```
 
-**Props:**
-- `label: string` -- stat label (e.g., "Cursussen Voltooid")
-- `value: string | number` -- the stat value
-- `icon?: React.ReactNode` -- optional Lucide icon
-- `trend?: { direction: "up" | "down"; value: string }` -- optional trend indicator (e.g., "+12%")
-- `className?: string`
+### Step 4: Verify and test
 
-**Implementation details:**
-- Surface: `var(--briefing-elevated)`, border: `var(--perimeter)`, radius: `var(--radius-lg)`
-- Value: Display typography (32px/700, tracking -0.02em) in `var(--uniform)` color
-- Label: Caption typography (13px/500) in `var(--uniform-tertiary)` color
-- Icon: placed top-right, 40px container with `var(--vest-light)` bg, `var(--radius-md)` radius, icon in `var(--vest)` color
-- Trend indicator: small text below value -- green (`--cleared`) with ArrowUp icon for "up", red (`--alert`) with ArrowDown icon for "down"
-- Padding: `var(--space-5)`
-- Shadow: `var(--shadow-lifted)`
-- Layout: icon top-right, value large below, label below value, trend indicator at bottom
-
-### Step 7: Create `src/components/shared/leaderboard-row.tsx`
-
-Single leaderboard entry row used on the Dashboard.
-
-**Props:**
-- `rank: number` -- position (1-based)
-- `name: string` -- guard name
-- `avatarInitials: string` -- 2-letter initials for avatar
-- `points: number` -- total points
-- `badgeCount: number` -- number of badges earned
-- `streak: number` -- current day streak
-- `isCurrentUser?: boolean` -- highlight this row
-- `className?: string`
-
-**Implementation details:**
-- Full-width row, flex layout, vertically centered items
-- Rank: ranks 1-3 get medal icons (gold/silver/bronze using `--vest` / `--uniform-tertiary` / `--vest-hover` colors), ranks 4+ show number in `var(--uniform-tertiary)`
-- Avatar: shadcn `Avatar` with initials fallback, 36px, `var(--vest-light)` background
-- Name: Subheading typography (16px/600)
-- Points: Body typography, `var(--uniform-secondary)`, with small trophy icon
-- Badge count: Caption typography with shield icon
-- Streak: Caption typography with flame icon (Lucide `Flame`), `var(--vest)` color
-- Current user row: `var(--vest-subtle)` background, `var(--perimeter-emphasis)` left border (3px)
-- Padding: `var(--space-3)` vertical, `var(--space-4)` horizontal
-- Border-bottom: `var(--perimeter-soft)` between rows
-- Radius: `var(--radius-md)` for current user row
-
-### Step 8: Create `src/components/shared/cert-card.tsx`
-
-Certification card with expiry status used on the Profile page.
-
-**Props:**
-- `name: string` -- certification name
-- `issuingBody: string` -- issuing organization
-- `earnedDate: string` -- date earned (formatted)
-- `expiryDate: string` -- expiry date (formatted)
-- `status: "geldig" | "verloopt" | "verlopen"` -- validity status
-- `className?: string`
-
-**Implementation details:**
-- Surface: `var(--briefing-elevated)`, border: `var(--perimeter)`, radius: `var(--radius-lg)`
-- Shield icon (from Lucide `ShieldCheck`) at top-left, colored by status: `var(--cleared)` for geldig, `var(--vest)` for verloopt, `var(--alert)` for verlopen
-- Cert name: Heading typography (20px/600)
-- Issuing body: Caption typography (13px/500), `var(--uniform-tertiary)`
-- Dates section: two columns -- "Behaald" (earned) and "Verloopt" (expires), Caption typography
-- Status badge (using BadgeTag component): geldig/verloopt/verlopen
-- Expiry countdown: if verloopt, show "Verloopt over X dagen" in `var(--vest)` color; if verlopen, show "Verlopen X dagen geleden" in `var(--alert)` color
-- Padding: `var(--space-5)`
-- Shadow: `var(--shadow-lifted)`
-- Border-left: 3px solid, colored by status (same as shield icon colors)
-
-### Step 9: Create `src/components/shared/deployment-card.tsx`
-
-Past deployment entry card used on the Profile page.
-
-**Props:**
-- `eventName: string`
-- `dateRange: string` -- formatted date range (e.g., "15-17 jul 2025")
-- `location: string`
-- `role: string` -- guard's role at the event
-- `linkedCourses: Array<{ id: string; title: string; completed: boolean }>`
-- `className?: string`
-
-**Implementation details:**
-- Surface: `var(--briefing-elevated)`, border: `var(--perimeter)`, radius: `var(--radius-lg)`
-- Event name: Heading typography (20px/600)
-- Date range: Caption typography (13px/500), `var(--uniform-tertiary)`, with Calendar icon (Lucide)
-- Location: Caption typography, `var(--uniform-secondary)`, with MapPin icon (Lucide)
-- Role: BadgeTag component with "active" variant showing the role
-- Linked courses section: small list of course names with shield mini-icons (green check for completed, amber partial for in-progress)
-- Padding: `var(--space-5)`
-- Shadow: `var(--shadow-lifted)`
-- Layout: flex column, with course list at bottom separated by `var(--perimeter-soft)` divider
-
-### Step 10: Verify all components
-
-- Run `npx tsc --noEmit` to verify TypeScript compilation
-- Run `npm run build` to verify build succeeds
-- Search codebase for hardcoded values: no hex colors, no `rgb()`, no raw `px` values outside of the design system (shield SVG path coordinates are acceptable)
-- Verify each component imports from `@/lib/utils` for `cn()` helper
-- Verify each component is a named export (not default export) for tree-shaking
+- Run `npx tsc --noEmit` to verify TypeScript compiles
+- Run `npm run build` to verify production build succeeds
+- Manual verification checklist:
+  1. Page loads at `/catalogus` showing all 15 courses
+  2. Typing in search bar filters courses by title and description in real-time
+  3. Selecting "Crowd Control" category filter shows only 3 courses
+  4. Selecting "Gevorderd" difficulty shows only advanced courses
+  5. Combining category + difficulty narrows results further
+  6. Active filter chips appear below the filter bar and can be dismissed
+  7. Clicking a category card sets that category as filter
+  8. Recommended section shows mandatory incomplete courses with reason tags
+  9. Empty state appears when no courses match filters
+  10. "Wis alle filters" button resets everything
+  11. Grid is 3 columns on desktop, 2 on tablet, 1 on mobile
+  12. Course cards link to `/cursus/[id]`
 
 ---
 
-## Files Created
+## Files Created/Modified
 
-| File | Purpose |
-|------|---------|
-| `src/components/shared/shield-progress.tsx` | Signature shield-shaped SVG progress indicator with animated fill |
-| `src/components/shared/deployment-readiness.tsx` | Event deployment readiness bar with shield indicators |
-| `src/components/shared/course-card.tsx` | Rich course card with thumbnail, metadata, shield progress, tags |
-| `src/components/shared/category-card.tsx` | Category card with icon, name, course count for catalog grid |
-| `src/components/shared/badge-tag.tsx` | Versatile badge/tag with 11 semantic variants |
-| `src/components/shared/stats-card.tsx` | Statistic display card with value, label, trend, icon |
-| `src/components/shared/leaderboard-row.tsx` | Leaderboard entry row with rank, avatar, points, streak |
-| `src/components/shared/cert-card.tsx` | Certification card with expiry status and countdown |
-| `src/components/shared/deployment-card.tsx` | Past deployment entry with event info and linked courses |
+| File | Action | Purpose |
+|------|--------|---------|
+| `src/components/shared/search-filter-bar.tsx` | CREATE | Reusable search input + filter dropdowns + active filter chips |
+| `src/app/catalogus/page.tsx` | MODIFY (replace placeholder) | Full catalog page with 6 sections |
+
+## Files NOT Modified (read-only dependencies)
+
+| File | Reason |
+|------|--------|
+| `src/components/shared/course-card.tsx` | Existing shared component, used as-is |
+| `src/components/shared/category-card.tsx` | Existing shared component, used as-is |
+| `src/components/shared/badge-tag.tsx` | Existing shared component, used as-is |
+| `src/data/mock/courses.ts` | Existing mock data, imported read-only |
+| `src/data/mock/events.ts` | Existing mock data, imported for recommendations |
+| `src/data/mock/guards.ts` | Existing mock data, imported for recommendations |
+| `src/lib/types.ts` | Existing types, imported |
+| `src/lib/constants.ts` | Existing constants (CATEGORIES, DIFFICULTY_LEVELS, COURSE_STATUSES), imported |
 
 ## Test Cases
 
 1. **TypeScript compiles**: `npx tsc --noEmit` passes with no errors
 2. **Build succeeds**: `npm run build` completes successfully
-3. **No hardcoded colors**: `grep -rn "rgb\|rgba\|#[0-9a-fA-F]" src/components/shared/` returns no matches (except SVG path data)
-4. **Shield animates**: ShieldProgress with `progress={75}` shows fill animation on initial render
-5. **Shield variants**: ShieldProgress with variant="complete" renders green, variant="overdue" renders red
-6. **Badge variants**: All 11 BadgeTag variants render with correct background/text colors
-7. **Course card hover**: CourseCard shadow transitions on hover (inspect with dev tools)
-8. **Responsive**: All components render without overflow at 375px viewport width
-9. **Cert card status**: CertCard with status="verloopt" shows amber warning styling and countdown text
-10. **Leaderboard current user**: LeaderboardRow with isCurrentUser=true has highlighted background
+3. **Search works**: typing "EHBO" in search bar shows only EHBO-related courses
+4. **Search is case-insensitive**: searching "ehbo" matches "EHBO Basiscursus"
+5. **Search matches description**: searching "festival" matches courses mentioning festivals in their description
+6. **Category filter**: selecting "Crowd Control" shows exactly 3 courses
+7. **Difficulty filter**: selecting "Gevorderd" filters to advanced courses only
+8. **Type filter**: selecting "Verplicht" shows exactly 4 mandatory courses
+9. **Combined filters**: selecting "Crowd Control" + "Gevorderd" narrows to 1 course
+10. **Active chips**: each active filter shows a dismissible chip; clicking X removes that filter
+11. **Category card click**: clicking a category card activates that category filter
+12. **Empty state**: applying impossible filter combination shows "Geen cursussen gevonden"
+13. **Reset filters**: "Wis alle filters" button clears search and all filters, showing all 15 courses
+14. **Recommendations**: "Aanbevolen voor jou" section shows 3-4 courses with Dutch reason tags
+15. **Recommendations hidden during filtering**: recommendations section not visible when search/filters are active
+16. **Responsive grid**: desktop shows 3 columns, tablet 2 columns, mobile 1 column
+17. **Course card navigation**: clicking a course card navigates to `/cursus/[id]`
+18. **No hardcoded colors**: all styling uses design system CSS variables
 
 ## Notes
 
-- TES-46 (types) must be merged before implementation starts. Components import `Course` and other types from `@/lib/types`
-- All components are client components (`"use client"`) since they use hooks (useState, useEffect) or event handlers
-- ShieldProgress uses `useEffect`+`useState` for mount animation -- initial render at 0, then animate to target
-- The shield SVG path should be a simple, recognizable shield shape. Use a basic 5-point path: pointed bottom, curved sides, flat/slightly curved top
-- Category-to-gradient mapping for course card thumbnails should be defined as a constant object within the component or in constants.ts
-- Components that don't need interactivity (like CertCard, DeploymentCard) can be server components -- only add "use client" where truly needed
-- Use `cn()` from `@/lib/utils` for all conditional class composition
-- Use Lucide icons exclusively (already installed via TES-45)
+- This is a `"use client"` page because it uses `useState` and `useMemo` for client-side filtering
 - All user-facing text is in Dutch
+- The `SearchFilterBar` component is created as a shared component in `src/components/shared/` so it can potentially be reused on other pages
+- Filter dropdowns use native `<select>` elements styled with design system tokens for simplicity -- no need for complex custom dropdown components
+- The recommended section is computed once (empty dependency array in useMemo) since mock data is static
+- Category cards remain visible until a category filter is explicitly selected, then they hide to avoid redundancy
+- Navigation uses Next.js `useRouter().push()` for course card clicks
+- The page header uses the existing pattern from the placeholder (title + subtitle)
