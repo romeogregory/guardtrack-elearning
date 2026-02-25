@@ -1,0 +1,178 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Foundation */
+  --briefing: hsl(40, 33%, 97%);
+  --briefing-elevated: hsl(40, 25%, 99%);
+  --briefing-top: hsl(0, 0%, 100%);
+
+  /* Text (Navy) */
+  --uniform: hsl(222, 47%, 14%);
+  --uniform-secondary: hsl(220, 25%, 38%);
+  --uniform-tertiary: hsl(220, 16%, 54%);
+  --uniform-muted: hsl(220, 12%, 70%);
+
+  /* Accent (Amber) */
+  --vest: hsl(38, 92%, 50%);
+  --vest-hover: hsl(38, 92%, 45%);
+  --vest-light: hsl(38, 90%, 93%);
+  --vest-subtle: hsl(38, 80%, 96%);
+
+  /* Semantic */
+  --cleared: hsl(152, 56%, 40%);
+  --cleared-light: hsl(152, 50%, 94%);
+  --alert: hsl(4, 72%, 52%);
+  --alert-light: hsl(4, 65%, 95%);
+  --caution: hsl(38, 92%, 50%);
+  --caution-light: hsl(38, 80%, 94%);
+  --dispatch: hsl(215, 65%, 52%);
+  --dispatch-light: hsl(215, 60%, 95%);
+
+  /* Border */
+  --perimeter: hsla(220, 20%, 50%, 0.12);
+  --perimeter-soft: hsla(220, 20%, 50%, 0.07);
+  --perimeter-emphasis: hsla(220, 20%, 50%, 0.22);
+  --perimeter-focus: hsla(38, 92%, 50%, 0.5);
+
+  /* Control */
+  --control-bg: hsl(220, 15%, 95%);
+  --control-border: hsla(220, 20%, 50%, 0.18);
+  --control-focus: hsl(38, 92%, 50%);
+
+  /* Spacing (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Depth (shadows) */
+  --shadow-lifted: 0 1px 3px hsla(220, 30%, 20%, 0.06),
+    0 1px 2px hsla(220, 30%, 20%, 0.04);
+  --shadow-raised: 0 4px 12px hsla(220, 30%, 20%, 0.08),
+    0 2px 4px hsla(220, 30%, 20%, 0.04);
+  --shadow-floating: 0 8px 24px hsla(220, 30%, 20%, 0.12),
+    0 4px 8px hsla(220, 30%, 20%, 0.06);
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Animation durations */
+  --duration-micro: 150ms;
+  --duration-state: 200ms;
+  --duration-expand: 250ms;
+  --duration-page: 300ms;
+
+  /* shadcn/ui mappings -> design system tokens */
+  --background: var(--briefing);
+  --foreground: var(--uniform);
+  --card: var(--briefing-elevated);
+  --card-foreground: var(--uniform);
+  --popover: var(--briefing-top);
+  --popover-foreground: var(--uniform);
+  --primary: var(--vest);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: var(--control-bg);
+  --secondary-foreground: var(--uniform);
+  --muted: var(--control-bg);
+  --muted-foreground: var(--uniform-tertiary);
+  --accent: var(--vest-subtle);
+  --accent-foreground: var(--uniform);
+  --destructive: var(--alert);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: var(--perimeter);
+  --input: var(--control-border);
+  --ring: var(--perimeter-focus);
+  --radius: 0.625rem;
+
+  /* Chart colors */
+  --chart-1: var(--vest);
+  --chart-2: var(--dispatch);
+  --chart-3: var(--cleared);
+  --chart-4: var(--alert);
+  --chart-5: var(--caution);
+
+  /* Sidebar (shadcn) */
+  --sidebar: var(--briefing);
+  --sidebar-foreground: var(--uniform);
+  --sidebar-primary: var(--vest);
+  --sidebar-primary-foreground: hsl(0, 0%, 100%);
+  --sidebar-accent: var(--vest-subtle);
+  --sidebar-accent-foreground: var(--uniform);
+  --sidebar-border: var(--perimeter);
+  --sidebar-ring: var(--perimeter-focus);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --font-sans: var(--font-plus-jakarta-sans), ui-sans-serif, system-ui,
+    sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Noto Color Emoji";
+}
+
+body {
+  background-color: var(--briefing);
+  color: var(--uniform);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
