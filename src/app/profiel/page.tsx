@@ -1,17 +1,17 @@
-export default function DashboardPage() {
+export default function ProfielPage() {
   return (
     <div>
       <h1
         className="text-2xl font-bold"
         style={{ color: "var(--uniform)" }}
       >
-        Dashboard
+        Profiel
       </h1>
       <p
         className="mt-2"
         style={{ color: "var(--uniform-secondary)" }}
       >
-        Welkom bij GuardTrack
+        Gebruikersprofiel
       </p>
     </div>
   );
