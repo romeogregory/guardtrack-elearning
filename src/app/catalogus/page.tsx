@@ -1,17 +1,17 @@
-export default function DashboardPage() {
+export default function CatalogusPage() {
   return (
     <div>
       <h1
         className="text-2xl font-bold"
         style={{ color: "var(--uniform)" }}
       >
-        Dashboard
+        Cursuscatalogus
       </h1>
       <p
         className="mt-2"
         style={{ color: "var(--uniform-secondary)" }}
       >
-        Welkom bij GuardTrack
+        Bekijk beschikbare cursussen
       </p>
     </div>
   );
